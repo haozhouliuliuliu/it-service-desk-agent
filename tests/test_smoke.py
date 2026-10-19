@@ -9,14 +9,14 @@ from it_agent.cli import main
 
 
 def test_version() -> None:
-    assert __version__ == "0.5.0"
+    assert __version__ == "1.0.0"
 
 
 def test_cli_version_exits_zero(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit) as excinfo:
         main(["--version"])
     assert excinfo.value.code == 0
-    assert "0.5.0" in capsys.readouterr().out
+    assert "1.0.0" in capsys.readouterr().out
 
 
 def test_cli_help_runs() -> None:
