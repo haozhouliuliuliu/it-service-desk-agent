@@ -14,7 +14,7 @@
 | M0 | 仓库骨架、CI、依赖与配置模板 | ✅ v0.1.0 |
 | M1 | 虚构数据、制度检索、7 个业务工具与注册表 | ✅ v0.2.0 |
 | M2 | Agent 循环、SQLite 状态机、事件与工具历史 | ✅ v0.3.0 |
-| M3 | HTTP API、人工确认、幂等写入、安全边界 | ⏳ 未开始 |
+| M3 | HTTP API、人工确认、幂等写入、安全边界 | ✅ v0.4.0 |
 | M4 | 固定测试集（30 例）、自动化测试、真实模型评估 | ⏳ 未开始 |
 | M5 | 架构文档、工具手册、测试报告、Docker、v1.0.0 | ⏳ 未开始 |
 
@@ -75,7 +75,7 @@
 - 不包含真实密钥；LLM API key 只从环境变量读取，仓库只提供 `.env.example`；
 - 不执行任何真实资产变更、付款或采购操作。
 
-## 快速开始（M2）
+## 快速开始（M3）
 
 ```bash
 python -m venv .venv
@@ -100,7 +100,10 @@ it-agent approve <task_id> <approval_id> --by 张会计
 it-agent reject  <task_id> <approval_id> --by 张会计
 it-agent input   <task_id> "补充信息"
 
-# 6) 测试
+# 6) 启动 HTTP API
+it-agent serve
+
+# 7) 测试
 pytest -q
 ```
 
@@ -114,6 +117,7 @@ pytest -q
 
 - 工具手册：`docs/tools.md`
 - 架构与数据流：`docs/architecture.md`
+- HTTP API：`docs/api.md`
 - 测试报告：`docs/testing.md`（M4 起）
 - 真实模型评估：`evidence/real-model/`（M4 起）
 - 已知限制：`docs/known-limitations.md`（M5 起）

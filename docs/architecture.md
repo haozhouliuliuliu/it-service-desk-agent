@@ -126,4 +126,32 @@ running ──► waiting_for_input ──► running
 ## 8. 并发边界
 
 当前是单进程假设：Runner 串行处理一个任务，SQLite 用 WAL + busy_timeout。
-同一任务并发执行由 M3 的 API 层任务锁限制；多 worker 需要数据库抢占（见已知限制）。
+同一任务并发执行由 API 层的任务锁限制；多 worker 需要数据库抢占（见已知限制）。
+
+## 9. HTTP 接口层（M3）
+
+```text
+FastAPI 路由
+  ├─ 参数校验（Pydantic）
+  ├─ 任务锁（进程内 threading.Lock）
+  ├─ BackgroundTasks → AgentRunner
+  └─ 读取 Repository 返回状态/事件/工具调用
+```
+
+- 创建任务时先 `prepare_task` 落库并返回 `task_id`，循环在后台线程执行；
+- 所有写接口（input / approval / resume）先检查任务锁，忙则 `409 TASK_BUSY`；
+- 状态、事件、工具调用直接查库，接口不做业务推断；
+- 启动时执行 `recover_interrupted()`，把 `running` 标为 `failed(INTERRUPTED)`；
+- 关闭时关闭模型客户端；SQLite 连接按调用开闭，WAL 允许并发读。
+
+幂等入口：
+
+| 操作 | 幂等策略 |
+|---|---|
+| approve 已执行 | 直接返回，不再执行 |
+| 模型重复写 | `approvals` 唯一约束 + 已执行复用 |
+| input 非等待态 | 400，不排队 |
+| resume 完成/超限 | 202 空操作 |
+| 并发执行 | 锁 + 409 |
+
+接口文档见 `docs/api.md`。

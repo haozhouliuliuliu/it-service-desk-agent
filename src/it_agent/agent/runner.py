@@ -46,6 +46,15 @@ _ALLOWED_TRANSITIONS: dict[str, set[str]] = {
     TaskStatus.LIMIT_REACHED.value: set(),
 }
 
+RESUMABLE_ERROR_CODES = {
+    "INTERRUPTED",
+    "LLM_TIMEOUT",
+    "LLM_CONNECTION_ERROR",
+    "LLM_HTTP_429",
+    "LLM_HTTP_5XX",
+    "LLM_INVALID_RESPONSE",
+}
+
 
 class AgentRunner:
     def __init__(
@@ -75,7 +84,9 @@ class AgentRunner:
 
     # ---------------------------------------------------------------- 对外入口
 
-    def create_task(self, user_input: str, *, task_id: str | None = None) -> TaskState:
+    def prepare_task(self, user_input: str, *, task_id: str | None = None) -> TaskState:
+        """只登记任务与初始消息，不执行循环（API 用它先返回 task_id）。"""
+
         text = user_input.strip()
         if not text:
             raise AgentError("任务内容不能为空")
@@ -91,7 +102,11 @@ class AgentRunner:
             "task_created",
             {"model": self.client.model, "max_tool_calls": self.max_tool_calls, "max_steps": self.max_steps},
         )
-        return self.run(identifier)
+        return self.repository.get_task(identifier)
+
+    def create_task(self, user_input: str, *, task_id: str | None = None) -> TaskState:
+        state = self.prepare_task(user_input, task_id=task_id)
+        return self.run(state.task_id)
 
     def run(self, task_id: str) -> TaskState:
         while True:
@@ -230,14 +245,7 @@ class AgentRunner:
         task = self.repository.get_task(task_id)
         if task.status != TaskStatus.FAILED.value:
             raise AgentError(f"任务当前状态为 {task.status}，只有失败任务可以恢复")
-        if task.error_code not in {
-            "INTERRUPTED",
-            "LLM_TIMEOUT",
-            "LLM_CONNECTION_ERROR",
-            "LLM_HTTP_429",
-            "LLM_HTTP_5XX",
-            "LLM_INVALID_RESPONSE",
-        }:
+        if task.error_code not in RESUMABLE_ERROR_CODES:
             raise AgentError(f"错误类型 {task.error_code} 不允许自动恢复，请人工处理")
         self._transition(task_id, TaskStatus.RUNNING, error_code=None, error_message=None)
         self.repository.add_event(task_id, "task_resumed", {})
