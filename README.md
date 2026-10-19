@@ -13,7 +13,7 @@
 |---|---|---|
 | M0 | 仓库骨架、CI、依赖与配置模板 | ✅ v0.1.0 |
 | M1 | 虚构数据、制度检索、7 个业务工具与注册表 | ✅ v0.2.0 |
-| M2 | Agent 循环、SQLite 状态机、事件与工具历史 | ⏳ 未开始 |
+| M2 | Agent 循环、SQLite 状态机、事件与工具历史 | ✅ v0.3.0 |
 | M3 | HTTP API、人工确认、幂等写入、安全边界 | ⏳ 未开始 |
 | M4 | 固定测试集（30 例）、自动化测试、真实模型评估 | ⏳ 未开始 |
 | M5 | 架构文档、工具手册、测试报告、Docker、v1.0.0 | ⏳ 未开始 |
@@ -46,13 +46,36 @@
 | `update_ticket` | 写入 | 修改工单状态/优先级，必须人工确认 |
 | `request_user_input` | 控制 | 信息不足时向用户提问，任务进入 `waiting_for_input` |
 
+## Agent 循环（M2）
+
+```text
+用户任务 → 模型 → tool_calls → 程序校验/执行 → 结果回灌 → 模型再决定
+                ├─ 只读工具：执行后继续
+                ├─ 写工具：挂起等待人工确认，确认后只执行该操作
+                ├─ request_user_input：挂起等待用户补充
+                └─ 无 tool_calls 且有内容：完成
+```
+
+| 硬约束 | 值 |
+|---|---|
+| 单任务工具调用上限 | 8 次（超出 → `limit_reached`） |
+| 单任务模型交互上限 | 12 轮（超出 → `limit_reached`） |
+| LLM 传输重试 | 2 次（仅超时/连接/429/5xx） |
+| 写操作 | 无 `ApprovalToken` 一律拒绝 |
+| 重复写操作 | 同任务同工具同参数复用确认结果，不重复写入 |
+
+状态：`running / waiting_for_input / waiting_for_approval / completed / failed / limit_reached`。
+进程重启时遗留 `running` 会标记为 `failed(INTERRUPTED)`，需显式 `resume`，不谎称自动恢复。
+
+任务、消息、事件、每次工具调用与确认记录全部落 SQLite，可用 `it-agent task <id>` 回看。
+
 ## 数据声明
 
 - 公司名、员工、设备编号、工单、制度文件全部虚构；
 - 不包含真实密钥；LLM API key 只从环境变量读取，仓库只提供 `.env.example`；
 - 不执行任何真实资产变更、付款或采购操作。
 
-## 快速开始（M1）
+## 快速开始（M2）
 
 ```bash
 python -m venv .venv
@@ -68,7 +91,16 @@ it-agent tools --json
 # 3) 检索制度
 it-agent search "新员工 电脑 领用"
 
-# 4) 测试
+# 4) 真实模型跑一个任务（需要 LLM_API_KEY，见 .env.example）
+it-agent run "现在笔记本电脑还有多少可用库存？"
+
+# 5) 回看轨迹 / 处理待确认
+it-agent task <task_id>
+it-agent approve <task_id> <approval_id> --by 张会计
+it-agent reject  <task_id> <approval_id> --by 张会计
+it-agent input   <task_id> "补充信息"
+
+# 6) 测试
 pytest -q
 ```
 
@@ -81,7 +113,7 @@ pytest -q
 ## 文档
 
 - 工具手册：`docs/tools.md`
-- 架构与数据流：`docs/architecture.md`（M2 起）
+- 架构与数据流：`docs/architecture.md`
 - 测试报告：`docs/testing.md`（M4 起）
 - 真实模型评估：`evidence/real-model/`（M4 起）
 - 已知限制：`docs/known-limitations.md`（M5 起）
