@@ -35,3 +35,37 @@ jobs:
           python -c "import eval.harness; print('harness import ok')"
       - name: Test
         run: pytest -q
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t it-service-desk-agent:ci .
+
+      - name: Run container and smoke test
+        run: |
+          docker run -d --name agent -p 8000:8000 \
+            -e LLM_API_KEY=sk-dummy-ci \
+            -e LLM_API_BASE=https://api.example.invalid/v1 \
+            -e LLM_MODEL=dummy-model \
+            it-service-desk-agent:ci
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/healthz > /tmp/health.json; then break; fi
+            sleep 1
+          done
+          cat /tmp/health.json
+          python -c "import json; d=json.load(open('/tmp/health.json')); assert d['status']=='ok', d; print('health ok, model:', d['model'])"
+          curl -fsS http://127.0.0.1:8000/api/tools > /tmp/tools.json
+          python -c "import json; d=json.load(open('/tmp/tools.json')); assert len(d)==8, len(d); print('tools:', len(d))"
+          test "$(docker exec agent id -u)" = "10001"
+          echo "running as uid 10001"
+
+      - name: Container logs
+        if: always()
+        run: docker logs agent
+
+      - name: Stop container
+        if: always()
+        run: docker rm -f agent

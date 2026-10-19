@@ -16,7 +16,7 @@
 | M2 | Agent 循环、SQLite 状态机、事件与工具历史 | ✅ v0.3.0 |
 | M3 | HTTP API、人工确认、幂等写入、安全边界 | ✅ v0.4.0 |
 | M4 | 固定测试集（30 例）、自动化测试、真实模型评估 | ✅ v0.5.0 |
-| M5 | 架构文档、工具手册、测试报告、Docker、v1.0.0 | ⏳ 未开始 |
+| M5 | 架构文档、工具手册、测试报告、Docker、v1.0.0 | ✅ v1.0.0 |
 
 ## 与"固定工作流"的区别
 
@@ -32,6 +32,21 @@
 
 程序负责：工具白名单、参数校验、权限判断、状态流转、事件记录、执行上限与失败处理。
 模型只能"提议"，不能直接触碰数据库、文件系统或系统命令。
+
+```mermaid
+flowchart LR
+    U[用户 / HTTP API] --> R[AgentRunner]
+    R -->|messages + tools| L[LLM<br/>tool calling]
+    L -->|tool_calls| R
+    R -->|校验参数/权限| T[ToolRegistry]
+    T -->|只读工具| S[(SQLite 业务数据)]
+    T -->|制度检索| P[虚构制度文档]
+    T -->|写工具| A{人工确认?}
+    A -->|未确认| W[waiting_for_approval]
+    A -->|确认| S
+    R -->|消息/事件/工具轨迹| D[(SQLite 任务状态)]
+    W -->|approve / reject| R
+```
 
 ## 已实现的工具（7 个业务工具 + 1 个控制工具）
 
@@ -91,6 +106,35 @@
 python -m eval.harness --output evidence/real-model
 ```
 
+## Docker 部署
+
+```bash
+export LLM_API_KEY=sk-...        # 真实任务必需；只注入环境变量
+docker compose up --build -d
+curl http://127.0.0.1:8000/healthz
+```
+
+- 镜像基于 `python:3.12-slim`，非 root（uid 10001），内置 healthcheck；
+- SQLite 与任务数据在命名卷 `agent-data`，重启后历史仍在；
+- 单 worker 运行（任务锁与 SQLite 为单进程设计），不要加 `--workers`；
+- CI 会真实构建镜像、启动容器并检查 `/healthz`、`/api/tools` 与运行用户。
+
+## 验收对照
+
+| 要求 | 证据 |
+|---|---|
+| Agent 循环、动态多步骤 | `src/it_agent/agent/runner.py`；`evidence/real-model/*/cases.json` 工具轨迹 |
+| 7 业务工具 + 控制工具 | `src/it_agent/tools/`、`it-agent tools --json`、`docs/tools.md` |
+| 工具真实执行、参数校验 | `tests/test_tools.py`（未知工具/非法参数/权限） |
+| 状态、持久化、历史 | SQLite 表 `tasks/messages/events/tool_calls/approvals`；`GET /events`、`/tool-calls` |
+| 人工确认、幂等写入 | `tests/test_agent_loop.py`、`tests/test_api.py`；重复确认不重复写 |
+| 上限、超时、有限重试 | `tests/test_agent_loop.py`；固定集 F1–F4 |
+| 自动化测试 ≥20 | **134 passed**，覆盖率 92% |
+| 真实模型 ≥10 次 / ≥5 多步骤 | **26 次真实 / 8 次多步骤，26/26、8/8** |
+| 固定测试集 30 例 | `eval/cases.json`、`docs/testing.md` |
+| Docker 与文档 | `Dockerfile`、`docker-compose.yml`、`docs/*.md` |
+| 已知限制 | `docs/known-limitations.md` |
+
 ## 数据声明
 
 - 公司名、员工、设备编号、工单、制度文件全部虚构；
@@ -143,7 +187,7 @@ python -m eval.harness --output evidence/real-model
 - HTTP API：`docs/api.md`
 - 测试报告：`docs/testing.md`
 - 真实模型评估：`evidence/real-model/`
-- 已知限制：`docs/known-limitations.md`（M5 起）
+- 已知限制：`docs/known-limitations.md`
 
 ## 许可
 

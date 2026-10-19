@@ -155,3 +155,20 @@ FastAPI 路由
 | 并发执行 | 锁 + 409 |
 
 接口文档见 `docs/api.md`。
+
+## 10. 部署（M5）
+
+```text
+docker compose up --build
+  ├── 镜像：python:3.12-slim，安装 .[server]
+  ├── 非 root 用户 uid 10001，/app/data 为数据卷
+  ├── 健康检查：GET /healthz（含数据库读取）
+  └── 端口 8000，环境变量注入模型配置
+```
+
+- 镜像内包含 `seed_data/`，启动时自动初始化虚构数据；
+- SQLite 与产物位于 `agent-data` 命名卷，重启后历史任务仍在；
+- 模型密钥只通过环境变量注入，不写入镜像层；
+- 容器以单 worker 运行（任务锁与 SQLite 都是单进程假设），不要加 `--workers`。
+
+CI 会真实构建镜像、启动容器、检查 `/healthz`、`/api/tools` 与运行用户，不只检查 Dockerfile 语法。
