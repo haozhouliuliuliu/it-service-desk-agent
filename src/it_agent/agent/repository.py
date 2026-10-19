@@ -61,13 +61,28 @@ class AgentRepository:
         finally:
             connection.close()
 
-    def list_tasks(self, limit: int = 20, offset: int = 0) -> list[TaskState]:
+    def list_tasks(self, limit: int = 20, offset: int = 0, status: str | None = None) -> list[TaskState]:
         connection = self._connect()
         try:
-            rows = connection.execute(
-                "SELECT * FROM tasks ORDER BY created_at DESC, task_id LIMIT ? OFFSET ?", (limit, offset)
-            ).fetchall()
+            if status is None:
+                rows = connection.execute(
+                    "SELECT * FROM tasks ORDER BY created_at DESC, task_id LIMIT ? OFFSET ?", (limit, offset)
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    "SELECT * FROM tasks WHERE status = ? ORDER BY created_at DESC, task_id LIMIT ? OFFSET ?",
+                    (status, limit, offset),
+                ).fetchall()
             return [self._task_state(row, None) for row in rows]
+        finally:
+            connection.close()
+
+    def count_tasks(self, status: str | None = None) -> int:
+        connection = self._connect()
+        try:
+            if status is None:
+                return int(connection.execute("SELECT COUNT(*) FROM tasks").fetchone()[0])
+            return int(connection.execute("SELECT COUNT(*) FROM tasks WHERE status = ?", (status,)).fetchone()[0])
         finally:
             connection.close()
 
