@@ -27,7 +27,11 @@ jobs:
           pip install -e ".[dev]"
       - name: Lint
         run: |
-          ruff check src tests
-          ruff format --check src tests
+          ruff check src tests eval
+          ruff format --check src tests eval
+      - name: Validate eval cases
+        run: |
+          python -c "import json; cases=json.load(open('eval/cases.json', encoding='utf-8')); assert len(cases)==30, len(cases); print('cases:', len(cases))"
+          python -c "import eval.harness; print('harness import ok')"
       - name: Test
         run: pytest -q

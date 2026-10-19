@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "it-service-desk-agent"
-version = "0.4.0"
+version = "0.5.0"
 description = "企业 IT 服务台与资产支持 Agent（虚构数据，演示多步骤工具调用与人工确认）"
 readme = "README.md"
 requires-python = ">=3.11"
