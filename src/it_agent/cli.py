@@ -56,6 +56,10 @@ def build_parser() -> argparse.ArgumentParser:
     supply = subparsers.add_parser("input", help="补充 Agent 需要的信息")
     supply.add_argument("task_id")
     supply.add_argument("text")
+
+    serve = subparsers.add_parser("serve", help="启动 HTTP API")
+    serve.add_argument("--host", default=None)
+    serve.add_argument("--port", type=int, default=None)
     return parser
 
 
@@ -173,6 +177,33 @@ def _cmd_input(task_id: str, text: str) -> int:
     return _exit_for(state)
 
 
+def _cmd_serve(host: str | None, port: int | None) -> int:
+    settings = Settings.from_env()
+    if port is not None and not 1 <= port <= 65535:
+        print("错误：--port 必须在 1..65535 之间")
+        return EXIT_CONFIG
+    try:
+        import uvicorn
+    except ImportError:
+        print('错误：未安装服务端依赖，请执行 pip install -e ".[server]"')
+        return EXIT_CONFIG
+
+    from .api import create_app
+
+    application = create_app(settings)
+    listen_host = host or settings.host
+    listen_port = port or settings.port
+    print(f"API 启动：http://{listen_host}:{listen_port}  文档：/docs")
+    uvicorn.run(
+        application,
+        host=listen_host,
+        port=listen_port,
+        log_config=None,
+        access_log=False,
+    )
+    return EXIT_OK
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -194,6 +225,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_decide(args.task_id, args.approval_id, "reject", args.decided_by)
         if args.command == "input":
             return _cmd_input(args.task_id, args.text)
+        if args.command == "serve":
+            return _cmd_serve(args.host, args.port)
     except AgentError as exc:
         print(f"错误：{exc}")
         return EXIT_CONFIG
