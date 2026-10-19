@@ -15,7 +15,7 @@
 | M1 | 虚构数据、制度检索、7 个业务工具与注册表 | ✅ v0.2.0 |
 | M2 | Agent 循环、SQLite 状态机、事件与工具历史 | ✅ v0.3.0 |
 | M3 | HTTP API、人工确认、幂等写入、安全边界 | ✅ v0.4.0 |
-| M4 | 固定测试集（30 例）、自动化测试、真实模型评估 | ⏳ 未开始 |
+| M4 | 固定测试集（30 例）、自动化测试、真实模型评估 | ✅ v0.5.0 |
 | M5 | 架构文档、工具手册、测试报告、Docker、v1.0.0 | ⏳ 未开始 |
 
 ## 与"固定工作流"的区别
@@ -69,6 +69,28 @@
 
 任务、消息、事件、每次工具调用与确认记录全部落 SQLite，可用 `it-agent task <id>` 回看。
 
+## 固定测试集与真实评估（M4）
+
+- **30 例固定集**：直接查询 5 / 多步骤 8 / 澄清 4 / 写确认 4 / 失败与上限 4 / 安全注入 5；
+- **26 例真实模型**通过真实 HTTP API 执行，4 例脚本化模型专测程序上限与异常路径；
+- 判定基于状态、工具调用、数据库副作用、关键文本，不依赖模型措辞；
+- 证据：`evidence/real-model/<run_id>/`（模型配置、完整轨迹、判定、报告）。
+
+最近一次真实运行（`deepseek-flash`，temperature=0）：
+
+```
+真实模型：26/26
+多步骤：  8/8
+全部：    30/30
+```
+
+三轮迭代（含失败）与安全结论见 [docs/testing.md](docs/testing.md)。
+
+```bash
+# 需要 LLM_API_KEY；不会在证据中写入密钥
+python -m eval.harness --output evidence/real-model
+```
+
 ## 数据声明
 
 - 公司名、员工、设备编号、工单、制度文件全部虚构；
@@ -103,8 +125,9 @@ it-agent input   <task_id> "补充信息"
 # 6) 启动 HTTP API
 it-agent serve
 
-# 7) 测试
+# 7) 自动化测试 + 固定集评估（评估需要 LLM_API_KEY）
 pytest -q
+python -m eval.harness --output evidence/real-model
 ```
 
 数据说明：
@@ -118,8 +141,8 @@ pytest -q
 - 工具手册：`docs/tools.md`
 - 架构与数据流：`docs/architecture.md`
 - HTTP API：`docs/api.md`
-- 测试报告：`docs/testing.md`（M4 起）
-- 真实模型评估：`evidence/real-model/`（M4 起）
+- 测试报告：`docs/testing.md`
+- 真实模型评估：`evidence/real-model/`
 - 已知限制：`docs/known-limitations.md`（M5 起）
 
 ## 许可

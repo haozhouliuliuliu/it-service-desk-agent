@@ -1,0 +1,12 @@
+{
+  "run_id": "run-20261019-070834",
+  "started_at": "2026-10-19T07:08:35+00:00",
+  "model": "deepseek-flash",
+  "api_base": "https://api.deepseek.com/v1",
+  "temperature": 0.0,
+  "max_tool_calls": 8,
+  "max_steps": 12,
+  "git_commit": "8c1a6e0b0f397360e29e279a23d7dff916967180",
+  "base_url": "http://127.0.0.1:59160",
+  "python": "3.12.10"
+}
