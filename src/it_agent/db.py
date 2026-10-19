@@ -51,8 +51,80 @@ CREATE TABLE IF NOT EXISTS tickets (
     comments_json TEXT NOT NULL DEFAULT '[]'
 );
 
-CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets (status, priority)
-;
+CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets (status, priority);
+
+CREATE TABLE IF NOT EXISTS tasks (
+    task_id         TEXT PRIMARY KEY,
+    status          TEXT NOT NULL CHECK (status IN (
+                        'running', 'waiting_for_input', 'waiting_for_approval',
+                        'completed', 'failed', 'limit_reached')),
+    user_input      TEXT NOT NULL,
+    final_answer    TEXT,
+    error_code      TEXT,
+    error_message   TEXT,
+    pending_question TEXT,
+    step_count      INTEGER NOT NULL DEFAULT 0,
+    tool_call_count INTEGER NOT NULL DEFAULT 0,
+    model           TEXT NOT NULL,
+    created_at      TEXT NOT NULL,
+    updated_at      TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS task_messages (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_id         TEXT NOT NULL REFERENCES tasks(task_id) ON DELETE CASCADE,
+    seq             INTEGER NOT NULL,
+    role            TEXT NOT NULL,
+    content         TEXT,
+    tool_calls_json TEXT,
+    tool_call_id    TEXT,
+    name            TEXT,
+    created_at      TEXT NOT NULL,
+    UNIQUE (task_id, seq)
+);
+
+CREATE TABLE IF NOT EXISTS agent_events (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_id      TEXT NOT NULL REFERENCES tasks(task_id) ON DELETE CASCADE,
+    seq          INTEGER NOT NULL,
+    type         TEXT NOT NULL,
+    payload_json TEXT NOT NULL DEFAULT '{}',
+    created_at   TEXT NOT NULL,
+    UNIQUE (task_id, seq)
+);
+
+CREATE TABLE IF NOT EXISTS tool_calls (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_id     TEXT NOT NULL REFERENCES tasks(task_id) ON DELETE CASCADE,
+    call_id     TEXT NOT NULL,
+    tool_name   TEXT NOT NULL,
+    args_json   TEXT NOT NULL,
+    result_json TEXT NOT NULL,
+    ok          INTEGER NOT NULL CHECK (ok IN (0, 1)),
+    error_code  TEXT,
+    created_at  TEXT NOT NULL,
+    UNIQUE (task_id, call_id)
+);
+
+CREATE TABLE IF NOT EXISTS approvals (
+    approval_id TEXT PRIMARY KEY,
+    task_id     TEXT NOT NULL REFERENCES tasks(task_id) ON DELETE CASCADE,
+    call_id     TEXT NOT NULL,
+    tool_name   TEXT NOT NULL,
+    args_json   TEXT NOT NULL,
+    args_hash   TEXT NOT NULL,
+    summary     TEXT NOT NULL,
+    status      TEXT NOT NULL CHECK (status IN ('pending', 'approved', 'rejected', 'executed')),
+    created_at  TEXT NOT NULL,
+    decided_at  TEXT,
+    decided_by  TEXT,
+    executed_at TEXT,
+    result_json TEXT,
+    UNIQUE (task_id, tool_name, args_hash)
+);
+
+CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks (status, created_at);
+CREATE INDEX IF NOT EXISTS idx_approvals_task ON approvals (task_id, status);
 """
 
 
