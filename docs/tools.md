@@ -1,4 +1,4 @@
-# 工具手册（M1）
+# 工具手册
 
 Agent 只能通过本文件列出的工具接触业务数据。工具注册表是**唯一入口**：模型提出调用，程序校验并执行，模型拿到结构化结果。
 
@@ -111,7 +111,7 @@ Agent 只能通过本文件列出的工具接触业务数据。工具注册表�
 | `question` | string(3..200) | 是 |
 | `options` | string[]（≤4） | 否 |
 
-返回 `{"waiting": true, ...}`；Runner 据此把任务置为 `waiting_for_input`（M2 实现）。
+返回 `{"waiting": true, ...}`；Runner 据此把任务置为 `waiting_for_input`。
 
 ## 3. 错误码
 
